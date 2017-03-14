@@ -126,7 +126,6 @@ public class MediaPlaybackActivity extends Activity implements MusicUtils.Defs,
     private Toast mToast;
     private int mTouchSlop;
     private ServiceToken mToken;
-    private boolean mReceiverUnregistered = true;
     private static MediaPlaybackActivity mActivity;
     private MusicPanelLayout mSlidingPanelLayout;
     private ImageButton mMenuOverFlow;
@@ -871,12 +870,6 @@ public class MediaPlaybackActivity extends Activity implements MusicUtils.Defs,
     @Override
     public void onStop() {
         paused = true;
-        unregisterReceiver(mScreenTimeoutListener);
-        if (!mReceiverUnregistered) {
-            mHandler.removeMessages(REFRESH);
-            unregisterReceiver(mStatusListener);
-            mReceiverUnregistered = true;
-        }
         MusicUtils.unbindFromService(mToken);
         mService = null;
         super.onStop();
@@ -895,15 +888,11 @@ public class MediaPlaybackActivity extends Activity implements MusicUtils.Defs,
         IntentFilter f = new IntentFilter();
         f.addAction(MediaPlaybackService.PLAYSTATE_CHANGED);
         f.addAction(MediaPlaybackService.META_CHANGED);
-        f.addAction(MediaPlaybackService.SHUFFLE_CHANGED);
-        f.addAction(MediaPlaybackService.REPEAT_CHANGED);
         registerReceiver(mStatusListener, f);
-        mReceiverUnregistered = false;
 
         IntentFilter s = new IntentFilter();
         s.addAction(Intent.ACTION_SCREEN_ON);
         s.addAction(Intent.ACTION_SCREEN_OFF);
-        registerReceiver(mScreenTimeoutListener, s);
         updateTrackInfo();
         long next = refreshNow();
         queueNextRefresh(next);
@@ -1936,43 +1925,6 @@ public class MediaPlaybackActivity extends Activity implements MusicUtils.Defs,
                 setPauseButtonImage();
             } else if (action.equals(MediaPlaybackService.PLAYSTATE_CHANGED)) {
                 setPauseButtonImage();
-            } else if (action.equals(MediaPlaybackService.SHUFFLE_CHANGED)) {
-                setShuffleButtonImage();
-            } else if (action.equals(MediaPlaybackService.REPEAT_CHANGED)) {
-                setRepeatButtonImage();
-            }
-        }
-    };
-
-    private BroadcastReceiver mScreenTimeoutListener = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (Intent.ACTION_SCREEN_ON.equals(intent.getAction())) {
-                if (mReceiverUnregistered) {
-                    IntentFilter f = new IntentFilter();
-                    f.addAction(MediaPlaybackService.PLAYSTATE_CHANGED);
-                    f.addAction(MediaPlaybackService.META_CHANGED);
-                    f.addAction(MediaPlaybackService.SHUFFLE_CHANGED);
-                    f.addAction(MediaPlaybackService.REPEAT_CHANGED);
-                    registerReceiver(mStatusListener, f);
-                    mReceiverUnregistered = false;
-                }
-                paused = false;
-
-                if (mPosOverride > 0) {
-                    mPosOverride = -1;
-                }
-                updateTrackInfo();
-                long next = refreshNow();
-                queueNextRefresh(next);
-            } else if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
-                paused = false;
-
-                if (!mReceiverUnregistered) {
-                    mHandler.removeMessages(REFRESH);
-                    unregisterReceiver(mStatusListener);
-                    mReceiverUnregistered = true;
-                }
             }
         }
     };
